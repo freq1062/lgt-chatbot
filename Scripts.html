@@ -1,0 +1,104 @@
+<script>
+  console.log("Scripts.html loaded successfully!")
+
+  async function highestSimilarity(source_sentence, faq_questions) {
+    /*Helper function for getFAQ(), since google apps script
+    doesn't have async */
+    const flattenedQuestions = faq_questions.flat();
+    console.time("calling huggingface")
+    const similarities = await wrapper("getSimilarities", source_sentence, flattenedQuestions)
+    console.timeEnd("calling huggingface")
+    const maxScore = Math.max(...similarities);
+    if (maxScore < 0.5) {
+      return null
+    } else {
+        const maxEle = flattenedQuestions[similarities.indexOf(maxScore)];
+        
+        // Find the parent array index in the original faq_questions
+        let parentIndex = 0;
+        for (var i = 0; i < faq_questions.length; i++) {
+          if (faq_questions[i].includes(maxEle)) {
+            parentIndex = i
+          }
+        }
+        return FAQ[parentIndex].answer;
+    }
+  }
+
+  async function getFAQ(userInput) {
+    /*
+    Compare user question with FAQ questions in spreadsheet and return associated answer
+    if the cosine similarity > 0.5, otherwise null
+    PRECONDITION: userInput is in english
+    */
+    let source_sentence = userInput
+    let faq_questions = FAQ.map(item => item.questions)
+
+    if (userInput.length > 1000) {
+      //Approximately 150 words on average
+      let promptSummary = ""
+      wrapper("getGroqSummary", userInput, 100)
+        .then((summary) => { promptSummary = summary })
+        .catch((e) => {
+          console.log(e)
+          promptSummary = userInput
+        })
+      source_sentence = promptSummary ? promptSummary : userInput
+      return highestSimilarity(source_sentence, faq_questions)
+    } else {
+      return highestSimilarity(source_sentence, faq_questions)
+    }
+  }
+
+  function imageToUrl(imageInput) {
+    /* Given a raw image file, convert the 
+    data to a base64 URL format. */
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        const buffer = reader.result;
+        const byteArray = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < byteArray.length; i++) {
+          binary += String.fromCharCode(byteArray[i]);
+        }
+        // Convert binary string to base64
+        const mimeType = imageInput.type;
+        const base64Url = `data:image/${mimeType};base64,${window.btoa(binary)}`;
+        resolve(base64Url);
+      };
+
+      reader.onerror = function () {
+        reject(new Error("Failed to read image file."));
+      };
+
+      reader.readAsArrayBuffer(imageInput);
+    });
+  }
+
+  async function translateAndRender(parentEle, targetLang) {
+    //Manually translate placeholder text because it wont be found by text element search
+    //Not sure if we actually want to translate this, uncomment if yes
+
+    // const textarea = document.getElementById('userInput');
+    // textarea.placeholder = await wrapper("translateText", textarea.placeholder, targetLang)
+    // const placeholder = textarea.placeholder;
+
+    const walker = document.createTreeWalker(parentEle, NodeFilter.SHOW_TEXT, null, false);
+
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    for (const node of textNodes) {
+      nodeText = node.nodeValue;
+      if (nodeText.length > 1 && nodeText.trim()) {
+        nodeText = await wrapper("translateText", nodeText, targetLang)
+      }
+      node.nodeValue = nodeText
+    }
+  }
+
+</script>

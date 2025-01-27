@@ -1,0 +1,128 @@
+<style>
+  html {
+    background: #185c94;
+    margin: 0;
+    height: 100%;
+    font-family: Lato, Arial, sans-serif;
+    color: white;
+    display: flex;
+    justify-content: center;
+  }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 15px;  /* Adds space between form elements */
+    margin-top: 20px;
+  }
+
+  textarea {
+    width: 80vw;
+    background-color: #21222a;
+    color: white;
+    border-radius: 8px;
+    resize: none;
+    overflow-y: hidden;
+    font-size: 14px;      /* Adjust font size as needed */
+    line-height: 1.5;     /* Adjust line height for better readability */
+  }
+
+  textarea:focus {
+    outline: none;        /* Remove default focus outline */
+    border: 2px solid #EA4C89; /* Optional: Change border color on focus */
+  }
+
+  .input-group {
+    margin-top: 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center; /* Align items vertically in the center */
+    justify-content: center; /* Center the group horizontally */
+    gap: 10px; /* Space between the label and input */
+  }
+
+  input[type="file"]::file-selector-button {
+    border-radius: 8px; /* Rounded corners */
+    padding: 10px 20px; /* Padding inside the button */
+    font-size: 14px; /* Font size of the button text */
+    background-color: #EA4C89; /* Button background color */
+    color: white; /* Text color */
+    border: none; /* Remove default border */
+    cursor: pointer; /* Pointer cursor on hover */
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); /* Add shadow for better appearance */
+    transition: background-color 0.3s ease; /* Smooth transition */
+  }
+  
+  button.submit-button:focus {
+    outline: none;
+    border: 2px solid white;
+  }
+
+  button {
+    background-color: #EA4C89;
+    border-radius: 8px;
+    border-style: none;
+    box-sizing: border-box;
+    /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); */
+    color: #FFFFFF;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 18px;
+    font-weight: 500;
+    width: 20vw;
+    height: 40px;
+    line-height: 20px;
+    list-style: none;
+    margin: 15px;
+    outline: none;
+    padding: 10px 16px;
+    position: relative;
+    text-align: center;
+    text-decoration: none;
+    transition: color 100ms;
+    vertical-align: baseline;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  button:hover {
+    background-color: #F082AC;
+  },
+
+  .loading-indicator {
+    margin: 20px;
+  }
+
+  .response {
+    text-align: left;
+  }
+
+  #imageInput {
+    display: none;
+  }
+
+  /* Style the custom button */
+  .custom-file-label {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #EA4C89;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .custom-file-label:hover {
+    background-color: #F082AC;
+  }
+
+  /* Display the chosen file name */
+  .file-name {
+    margin-left: 10px;
+    font-style: italic;
+    color: #555;
+  }
+
+</style>
