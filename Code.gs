@@ -15,13 +15,21 @@ return HtmlService.createTemplateFromFile('Index.html')
 }
 
 function translateText(text, targetLanguage) {
+  /*Given a short length of text, return
+  the translated text in targetLanguage.*/
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(text)}`
-  const response = UrlFetchApp.fetch(url);
-  const result = JSON.parse(response.getContentText());
-  return result[0][0][0]
+  try {
+    const response = UrlFetchApp.fetch(url);
+    const result = JSON.parse(response.getContentText());
+    return result[0][0][0]
+  } catch(e) {
+    throw new Error("Unable to translate text: " + e)
+  }
 }
 
 function massTranslate(text, targetLanguage) {
+  /* Given a long string of text, batch translations
+  by sentences to minimize API calls.*/
   const urlBase = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLanguage)}&dt=t`;
   const maxUrlLength = 1300;
 
@@ -60,7 +68,16 @@ function massTranslate(text, targetLanguage) {
   return batchResults.join("");
 }
 
+function massArrTranslate(textArr, targetLanguage) {
+  /* Given an array of text representing text elements,
+  return an array of the same length with each element translated.*/
+  let text = textArr.join("|||")
+  const translatedText = massTranslate(text, targetLanguage)
+  return translatedText.split("|||")
+}
+
 function detectLanguage(text) {
+  /*Given a string of text, return the language as a Google Translate string*/
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`;
   const response = UrlFetchApp.fetch(url);
   const result = JSON.parse(response.getContentText());
@@ -70,20 +87,54 @@ function detectLanguage(text) {
 
 function getFAQdata() {
   /*Return the FAQ data in the following format: 
-  [{question: str, answer: str}, {question: str, answer: str} ...]*/
+  [{questions: [str, str], answer: str}, ...]\
+  If the answer is a pdf, return the embeddable pdf link
+  If the answer is markdown, return the raw text
+  If the answer is plaintext, return the plaintext
+  */
   const QUESTIONCOL = 0;
   const ANSWERCOL = 1;
 
   // Google Sheet ID
   const sheet = SpreadsheetApp.openById("1VT4hg034N62UlFMpj7md9PWajmWjJEkxK4sP-_5CCmM");
   const data = sheet.getDataRange().getValues(); // Get all data from the sheet
+  let result = [];
 
-  // Use map to efficiently transform the data and skip the header row
-  return data.slice(1).map(row => ({
-    question: row[QUESTIONCOL],
-    answer: row[ANSWERCOL]
-  }));
+  for (var i = 1; i < data.length; i++) {
+    var questions = data[i][QUESTIONCOL].split(";")
+    var answer = data[i][ANSWERCOL]
+    var type = "text"
+
+    //Check if answer is a smart chip
+    if (answer.startsWith("https://drive.google.com/file/d/")) {
+      const match = answer.match(/\/d\/(.+)\//)
+      if (match) {
+        var id = match[1]
+        try {
+          var file = DriveApp.getFileById(id);
+          var mimeType = file.getMimeType();
+          //Check between markdown and pdf
+          if (mimeType == 'text/markdown') {
+            answer = file.getBlob().getDataAsString()
+            type = "markdown"
+          } else if (mimeType == 'application/pdf') {
+            // var encoded = encodeURIComponent(`https://drive.google.com/file/d/${id}/preview`)
+            // answer = `https://docs.google.com/viewer?url=${encoded}&embedded=true`;
+            answer = `https://drive.google.com/file/d/${id}/preview`
+            type = "pdf"
+          }
+        } catch(e) {
+          answer = "Invalid file ID:", answer
+        }
+      } else {
+        answer = `Invalid file: ${answer}`
+      }
+    }
+    result.push({ questions: questions, answer: answer, type: type });
+  }
+  return result
 }
+// console.log(getFAQdata().pop())
 
 function cosineSimilarity(vec1, vec2) {
   /*Helper function for getSimilarities */
@@ -391,11 +442,9 @@ function getContent(userInput, image_url=null, lang) {
   /*General function to minimize the number of 
   frontend to backend calls. */
   let response = getGroqResponse(userInput, image_url)
-  console.log(response)
   if (lang != 'en') {
     response = massTranslate(response, lang)
   }
-  console.log(response)
   return getGroqFormatting(response);
 }
 
@@ -414,5 +463,3 @@ function getDocData() {
   const markdownContent = response.getContentText();
   return parseMarkdownTable(markdownContent);
 }
-
-console.log(getDocData()[3])

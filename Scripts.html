@@ -6,10 +6,10 @@
     doesn't have async */
     const flattenedQuestions = faq_questions.flat();
     console.time("calling huggingface")
-    const similarities = await wrapper("getSimilarities", source_sentence, flattenedQuestions)
+    const similarities = await wrapper("getSimilarities", fallback=[], source_sentence, flattenedQuestions)
     console.timeEnd("calling huggingface")
     const maxScore = Math.max(...similarities);
-    if (maxScore < 0.5) {
+    if (maxScore < 0.1) {
       return null
     } else {
         const maxEle = flattenedQuestions[similarities.indexOf(maxScore)];
@@ -21,7 +21,7 @@
             parentIndex = i
           }
         }
-        return FAQ[parentIndex].answer;
+        return FAQ[parentIndex];
     }
   }
 
@@ -37,7 +37,7 @@
     if (userInput.length > 1000) {
       //Approximately 150 words on average
       let promptSummary = ""
-      wrapper("getGroqSummary", userInput, 100)
+      wrapper("getGroqSummary", fallback=userInput.substring(0, 1000), userInput, 100)
         .then((summary) => { promptSummary = summary })
         .catch((e) => {
           console.log(e)
@@ -78,26 +78,23 @@
   }
 
   async function translateAndRender(parentEle, targetLang) {
-    //Manually translate placeholder text because it wont be found by text element search
-    //Not sure if we actually want to translate this, uncomment if yes
-
-    // const textarea = document.getElementById('userInput');
-    // textarea.placeholder = await wrapper("translateText", textarea.placeholder, targetLang)
-    // const placeholder = textarea.placeholder;
-
     const walker = document.createTreeWalker(parentEle, NodeFilter.SHOW_TEXT, null, false);
 
     const textNodes = [];
+    const untranslatedTexts = []
     while (walker.nextNode()) {
-      textNodes.push(walker.currentNode);
-    }
+      var currentNode = walker.currentNode
+      var nodeText = currentNode.nodeValue;
 
-    for (const node of textNodes) {
-      nodeText = node.nodeValue;
       if (nodeText.length > 1 && nodeText.trim()) {
-        nodeText = await wrapper("translateText", nodeText, targetLang)
+        untranslatedTexts.push(nodeText)
+        textNodes.push(currentNode);
       }
-      node.nodeValue = nodeText
+    }
+    const translatedTexts = await wrapper('massArrTranslate', fallback=untranslatedTexts, untranslatedTexts, targetLang)
+
+    for (var i = 0; i < textNodes.length; i++) {
+      textNodes[i].nodeValue = translatedTexts[i]
     }
   }
 
