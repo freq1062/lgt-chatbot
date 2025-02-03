@@ -170,7 +170,7 @@
             <iframe src=${faqAnswer.answer} width="100%" height="600px"></iframe>`
           } else { //Render markdown or plaintext
             console.time("faq rendering")
-            responseEle.innerHTML = "<h2>Response (From FAQ):</h2>" + texme.render(faqAnswer)
+            responseEle.innerHTML = "<h2>Response (From FAQ):</h2>" + texme.render(faqAnswer.answer)
             if (detectedLang != 'en') {
               loadingIndicator.textContent = await wrapper('translateText', fallback='Translating FAQ response...', 'Translating FAQ response...', detectedLang)
               await translateAndRender(responseEle, detectedLang)
