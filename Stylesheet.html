@@ -3,10 +3,11 @@
     background: #185c94;
     margin: 0;
     height: 100%;
-    font-family: Lato, Arial, sans-serif;
+    font-family: 'Liter', Arial, sans-serif;
     color: white;
     display: flex;
     justify-content: center;
+    font-size: 16px;
   }
 
   main {
@@ -21,12 +22,26 @@
   textarea {
     width: 80vw;
     background-color: #21222a;
-    color: white;
+    color: #f8f8f8;
     border-radius: 8px;
     resize: none;
     overflow-y: hidden;
-    font-size: 14px;      /* Adjust font size as needed */
-    line-height: 1.5;     /* Adjust line height for better readability */
+    font-size: 16px;
+    line-height: 1.6;
+    letter-spacing: 0.5px;
+  }
+
+  .liter-regular {
+    font-family: "Liter", serif;
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  [data-status="loading"] {
+    display: flex;
+    justify-content: center; /* Horizontally centers */
+    align-items: center;     /* Vertically centers */
+    height: 100vh;           /* Optional: makes the div take full height of the viewport */
   }
 
   textarea:focus {
@@ -55,9 +70,11 @@
     transition: background-color 0.3s ease; /* Smooth transition */
   }
   
-  button.submit-button:focus {
-    outline: none;
-    border: 2px solid white;
+  button.submit-button:focus,
+  button.custom-file-label:focus,
+  textarea:focus,
+  input[type="file"]:focus {
+    outline: 3px solid #FFD700; /* High contrast focus indicator */
   }
 
   button {
@@ -65,27 +82,29 @@
     border-radius: 8px;
     border-style: none;
     box-sizing: border-box;
-    /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     color: #FFFFFF;
     cursor: pointer;
-    display: inline-block;
+    display: inline-flex;
     font-size: 18px;
     font-weight: 500;
-    width: 20vw;
-    height: 40px;
-    line-height: 20px;
-    list-style: none;
+    padding: 12px 20px;
     margin: 15px;
     outline: none;
-    padding: 10px 16px;
-    position: relative;
     text-align: center;
     text-decoration: none;
     transition: color 100ms;
-    vertical-align: baseline;
+    vertical-align: middle;
     user-select: none;
     -webkit-user-select: none;
     touch-action: manipulation;
+    min-width: 44px;
+    min-height: 44px;
+    height: auto;
+    width: auto;
+    line-height: normal;
+    align-items: center;
+    justify-content: center;
   }
 
   button:hover {
@@ -104,25 +123,43 @@
     display: none;
   }
 
-  /* Style the custom button */
   .custom-file-label {
-    display: inline-block;
-    padding: 10px 20px;
-    background-color: #EA4C89;
-    color: white;
-    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
     cursor: pointer;
   }
 
-  .custom-file-label:hover {
-    background-color: #F082AC;
+  .submit-button {
+    font-size: 20px;
   }
 
-  /* Display the chosen file name */
+  .icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+  }
+
+  .loading-icon {
+    width: 100px;
+    height: 100px;
+  }
+
   .file-name {
-    margin-left: 10px;
+    margin-left: 5px;
     font-style: italic;
-    color: #555;
+    color: #f8f8f8;
+    font-size: 16px;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
   }
 
 </style>
