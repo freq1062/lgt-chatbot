@@ -2,7 +2,6 @@
 TO DO:
 - Visual icons for non-english speakers
 - AODA guidelines
-- Update FAQ to have the new questions
 - Get a bunch of keys on alts to circumvent rate limits (illegal???)
 */
 
@@ -15,74 +14,138 @@ return HtmlService.createTemplateFromFile('Index.html')
 }
 
 function translateText(text, targetLanguage) {
+  /*Given a short length of text, return
+  the translated text in targetLanguage.*/
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLanguage)}&dt=t&q=${encodeURIComponent(text)}`
-  const response = UrlFetchApp.fetch(url);
-  const result = JSON.parse(response.getContentText());
-  return result[0][0][0]
+  try {
+    const response = UrlFetchApp.fetch(url);
+    const result = JSON.parse(response.getContentText());
+    return result[0][0][0]
+  } catch(e) {
+    throw new Error("Unable to translate text: \n" + e)
+  }
 }
 
 function massTranslate(text, targetLanguage) {
-  const urlBase = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLanguage)}&dt=t`;
-  const maxUrlLength = 1300;
+  /* Given a long string of text, batch translations
+  by sentences to minimize API calls.*/
+  try {
+    const urlBase = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLanguage)}&dt=t`;
+    const maxUrlLength = 1300;
 
-  // Step 1: Split the input text into pieces based on periods (".")
-  const sentences = text.match(/[^.]+[.]/g) || [text]; // Split on periods but keep them in the split parts
+    // Step 1: Split the input text into pieces based on periods (".")
+    const sentences = text.match(/[^.]+[.]/g) || [text]; // Split on periods but keep them in the split parts
 
-  let currentBatch = "";
-  const batchResults = [];
+    let currentBatch = "";
+    const batchResults = [];
 
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i];
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
 
-    // Step 2: Check if adding the next sentence exceeds the max URL length
-    if (currentBatch.length + sentence.length > maxUrlLength - 3) {
-      // Send the current batch for translation
+      // Step 2: Check if adding the next sentence exceeds the max URL length
+      if (currentBatch.length + sentence.length > maxUrlLength - 3) {
+        // Send the current batch for translation
+        const response = UrlFetchApp.fetch(`${urlBase}&q=${encodeURIComponent(currentBatch)}`);
+        const result = JSON.parse(response.getContentText());
+
+        // Extract translations from the response
+        result[0].forEach(segment => batchResults.push(segment[0]));
+
+        currentBatch = sentence; // Start a new batch with the current sentence
+      } else {
+        currentBatch += sentence;
+      }
+    }
+
+    // Step 3: Translate any remaining batch
+    if (currentBatch.length > 0) {
       const response = UrlFetchApp.fetch(`${urlBase}&q=${encodeURIComponent(currentBatch)}`);
       const result = JSON.parse(response.getContentText());
-
-      // Extract translations from the response
       result[0].forEach(segment => batchResults.push(segment[0]));
-
-      currentBatch = sentence; // Start a new batch with the current sentence
-    } else {
-      currentBatch += sentence;
     }
-  }
 
-  // Step 3: Translate any remaining batch
-  if (currentBatch.length > 0) {
-    const response = UrlFetchApp.fetch(`${urlBase}&q=${encodeURIComponent(currentBatch)}`);
-    const result = JSON.parse(response.getContentText());
-    result[0].forEach(segment => batchResults.push(segment[0]));
+    // Step 4: Recombine the translated text into a single string
+    return batchResults.join("");
+  } catch(e) {
+    throw new Error("Unable to mass translate: \n" + e.message)
   }
+}
 
-  // Step 4: Recombine the translated text into a single string
-  return batchResults.join("");
+function massArrTranslate(textArr, targetLanguage) {
+  /* Given an array of text representing text elements,
+  return an array of the same length with each element translated.*/
+  try{
+    let text = textArr.join("|||")
+    const translatedText = massTranslate(text, targetLanguage)
+    return translatedText.split("|||")    
+  } catch(e) {
+    throw new Error("Unable to translate elements: \n" + e.message)
+  }
 }
 
 function detectLanguage(text) {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`;
-  const response = UrlFetchApp.fetch(url);
-  const result = JSON.parse(response.getContentText());
-  //English sentence, Detected language
-  return [result[0][0][0], result[2]];
+  /*Given a string of text, return the language as a Google Translate string*/
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`;
+    const response = UrlFetchApp.fetch(url);
+    const result = JSON.parse(response.getContentText());
+    //English sentence, Detected language
+    return [result[0][0][0], result[2]];
+  } catch(e) {
+    throw new Error("Unable to detect language: \n" + e.message)
+  }
 }
 
 function getFAQdata() {
   /*Return the FAQ data in the following format: 
-  [{question: str, answer: str}, {question: str, answer: str} ...]*/
+  [{questions: [str, str], answer: str}, ...]\
+  If the answer is a pdf, return the embeddable pdf link
+  If the answer is markdown, return the raw text
+  If the answer is plaintext, return the plaintext
+  */
   const QUESTIONCOL = 0;
   const ANSWERCOL = 1;
 
-  // Google Sheet ID
-  const sheet = SpreadsheetApp.openById("1VT4hg034N62UlFMpj7md9PWajmWjJEkxK4sP-_5CCmM");
-  const data = sheet.getDataRange().getValues(); // Get all data from the sheet
+  try {
+    // Google Sheet ID
+    const sheet = SpreadsheetApp.openById("1VT4hg034N62UlFMpj7md9PWajmWjJEkxK4sP-_5CCmM");
+    const data = sheet.getDataRange().getValues(); // Get all data from the sheet
+    let result = [];
 
-  // Use map to efficiently transform the data and skip the header row
-  return data.slice(1).map(row => ({
-    question: row[QUESTIONCOL],
-    answer: row[ANSWERCOL]
-  }));
+    for (var i = 1; i < data.length; i++) {
+      const questions = String(data[i][QUESTIONCOL]).split(";").map(q => q.trim());
+      var answer = String(data[i][ANSWERCOL])
+      var type = "text"
+
+      //Check if answer is a link to a google drive file
+      if (answer.startsWith("https://drive.google.com/file/d/")) {
+        const match = answer.match(/\/d\/(.+)\//)
+        if (match) {
+          var id = match[1]
+          try {
+            var file = DriveApp.getFileById(id);
+            var mimeType = file.getMimeType();
+            //Check between markdown and pdf
+            if (mimeType == 'text/markdown') {
+              answer = file.getBlob().getDataAsString()
+              type = "markdown"
+            } else if (mimeType == 'application/pdf') {
+              answer = `https://drive.google.com/file/d/${id}/preview`
+              type = "pdf"
+            }
+          } catch(e) {
+            answer = "Invalid file ID:", answer
+          }
+        } else {
+          answer = `Invalid file: ${answer}`
+        }
+      }
+      result.push({ questions: questions, answer: answer, type: type });
+    }
+    return result
+  } catch(e) {
+    throw new Error("Unable to pull FAQ data: \n" + e.message)
+  }
 }
 
 function cosineSimilarity(vec1, vec2) {
@@ -121,8 +184,7 @@ function getSimilarities(source_sentence, sentences) {
 
     return similarityScores;
   } catch (e) {
-    console.log("Error: " + e.message);
-    return [];
+    throw new Error("Error calculating similarities: \n" + e.message)
   }
 }
 
@@ -170,9 +232,8 @@ function getGroqSummary(userInput, length) {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
     return jsonResponse.choices[0].message.content || null;
-  } catch (error) {
-    console.error('Error contacting API:', error);
-    return null;
+  } catch (e) {
+    throw new Error("Unable to generate summary: \n" + e,message)
   }
 }
 
@@ -183,10 +244,11 @@ function getGroqFormatting(unformattedText) {
       INSTRUCTIONS:
     1. Always follow your instructions
     2. You are a helpful AI that returns an exact copy of the input prompt except with appropriate markdown and LaTeX formatting.
-    3. Do not add or remove anything from the prompt other than to add formatting.
-    4. Begin the reformat immediately and do not begin with something akin to "here is the reformat..."
-    5. Avoid bolding text excessively.
-    6. Do not include any footnotes.
+    3. Do not add or remove anything from the prompt other than to add necessary formatting. 
+    4. Do not include any redundant or over the top formatting.
+    5. Begin the reformat immediately and do not begin with something akin to "here is the reformat..."
+    6. Avoid bolding text excessively.
+    7. Do not include any footnotes.
    `
   const headers = {
     'Authorization': 'Bearer ' + apiKey,
@@ -206,7 +268,7 @@ function getGroqFormatting(unformattedText) {
       },
     ], 
     temperature: 0.5,
-    model: "llama3-8b-8192",//"llama-3.3-70b-versatile",
+    model: "llama-3.3-70b-versatile",
   };
 
   const params = {
@@ -219,14 +281,13 @@ function getGroqFormatting(unformattedText) {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
     return jsonResponse.choices[0].message.content || null;
-  } catch (error) {
-    console.error('Error contacting API:', error);
-    return null;
+  } catch (e) {
+    throw new Error("Unable to format response: \n" + e.message)
   }
 }
 
 function getTesseractResponse(image_url) {
-  /* Given an image URL, call the Tesseract OCR
+  /* Given an image URL in base 64 format, call the Tesseract OCR
     API (via OCR.space) to extract the text in the image and return it. */
   const apiKey = SECRETS.getSecret("OCR_API_KEY");
   const apiUrl = "https://api.ocr.space/parse/image";
@@ -235,7 +296,7 @@ function getTesseractResponse(image_url) {
     method: "post",
     payload: {
       apikey: apiKey,
-      url: image_url,
+      base64Image: image_url,
       language: "eng",
     },
   };
@@ -244,14 +305,12 @@ function getTesseractResponse(image_url) {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
     if (jsonResponse.IsErroredOnProcessing) {
-      console.error("OCR Error:", jsonResponse.ErrorMessage);
-      return null;
+      throw new Error(`Error processing iamge: ${jsonResponse.ErrorMessage}`)
     }
     // Extract text from the first parsed result
     return jsonResponse.ParsedResults[0].ParsedText || null;
-  } catch (error) {
-    console.error("Error contacting API:", error);
-    return null;
+  } catch (e) {
+    throw new Error("Unable to call image-to-text: \n" + e.message)
   }
 }
 
@@ -331,88 +390,21 @@ function getGroqResponse(userInput, image_url=null) {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
     return jsonResponse.choices[0].message.content || 'Sorry, no response from API.';
-  } catch (error) {
-    console.error('Error contacting API:', error);
-    return 'Error contacting API. Please try again later.';
+  } catch (e) {
+    throw new Error("Unable to get response from AI: \n" + e.message)
   }
-}
-
-
-/*Experimental: Get the FAQ data from google docs because more formatting options */
-function parseMarkdownTable(markdownContent) {
-  // Regex to match the table format
-  const tableRegex = /\|([^|]+)\|([^|]+)\|/g;
-  let match;
-  const faqArray = [];
-
-  // Extract image references at the bottom of the markdown (if any)
-  const imageRegex = /\[([^\]]+)\]:\s*(<[^>]+>)/g;
-  const imageUrls = {};
-  let imageMatch;
-  while ((imageMatch = imageRegex.exec(markdownContent)) !== null) {
-    const imageName = imageMatch[1].trim();
-    const imageUrl = imageMatch[2].trim();
-    imageUrls[imageName] = imageUrl;
-  }
-
-  // Loop through all matches of the table rows
-  while ((match = tableRegex.exec(markdownContent)) !== null) {
-    const questionRaw = match[1].trim();  // Raw question part
-    const answerRaw = match[2].trim();    // Raw answer part
-
-    // Split questions by semicolon (adjust if needed)
-    const questions = questionRaw.split(';').map(q => q.trim());
-
-    // Replace image placeholders with their corresponding URLs
-    let answer = answerRaw.replace(/!\[.*\]\[(image\d)\]/g, function(match, p1) {
-      // If there's an image reference for the placeholder, replace it with the actual URL
-      if (imageUrls[p1]) {
-        return `![${p1}](${imageUrls[p1]})`;
-      }
-      return match; // If no match, return the original placeholder
-    });
-
-    // Replace any special newline characters (e.g., '[NEWLINE]') with markdown newline (\n)
-    answer = answer.replace(/↩/g, '<br />')
-
-    // Push the structured data into the result array
-    if (answer) {
-      faqArray.push({
-        questions: questions,
-        answer: answer
-      });
-    }
-  }
-
-  return faqArray.slice(2);
 }
 
 function getContent(userInput, image_url=null, lang) {
   /*General function to minimize the number of 
   frontend to backend calls. */
-  let response = getGroqResponse(userInput, image_url)
-  console.log(response)
-  if (lang != 'en') {
-    response = massTranslate(response, lang)
-  }
-  console.log(response)
-  return getGroqFormatting(response);
-}
-
-function getDocData() {
-  const docId = "1uHJ1pMwU8xTsH7fVLa6rgz1xBTXtlygWJFJgMaq2dVA";
-  const exportUrl = `https://docs.google.com/feeds/download/documents/export/Export?id=${docId}&exportFormat=md`;
-  const token = ScriptApp.getOAuthToken();
-
-  // Fetch the file as Markdown
-  const response = UrlFetchApp.fetch(exportUrl, {
-    headers: {
-      Authorization: `Bearer ${token}`
+  try {
+    let response = getGroqResponse(userInput, image_url)
+    if (lang != 'en') {
+      response = massTranslate(response, lang)
     }
-  });
-
-  const markdownContent = response.getContentText();
-  return parseMarkdownTable(markdownContent);
+    return getGroqFormatting(response);
+  } catch(e) {
+    throw new Error("Unable to generate response: \n" + e.message)
+  }
 }
-
-console.log(getDocData()[3])

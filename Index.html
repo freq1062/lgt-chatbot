@@ -4,9 +4,15 @@
     <!-- Import CSS and Javascript -->
     <?!= HtmlService.createHtmlOutputFromFile('Stylesheet.html').getContent(); ?>
     <?!= HtmlService.createHtmlOutputFromFile('Scripts.html').getContent(); ?>
-
+    
+    <!-- Configure markdown & latex formatting -->
     <script>window.texme = { style: 'plain', renderOnLoad: false }</script>
     <script src="https://cdn.jsdelivr.net/npm/texme@1.2.2"></script>
+
+    <!-- Import epic custom font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Liter&display=swap" rel="stylesheet">
 
     <script>
       MathJax = {
@@ -22,66 +28,89 @@
 
   </head> 
   <body>
-    <p data-status="loading">Getting data ready...</p>
-    <main data-status="loaded" style="display: none;" id="page">
+    <div data-status="loading">
+      <p aria-live="assertive">Getting data ready...</p>
+      <img 
+        src="https://mir-s3-cdn-cf.behance.net/project_modules/disp/dae67631234507.564a1d230a290.gif" 
+        alt="loading icon" 
+        class="loading-icon">
+    </div>
+    <main data-status="loaded" id="page" hidden>
       <h1>How can we help?</h1>
       <form id="userForm" onsubmit="getResponse(event);updateCharCount();">
-        <textarea 
+        <label for="userInput" class="sr-only" hidden>Enter your question:</label>
+        <textarea
           id="userInput" 
           rows="6" 
           cols="50" 
-          placeholder="Enter your question; e.g. How do I contact Let's Get Together?" 
+          placeholder="How do I contact Let's Get Together?" 
           maxlength="5000"
           oninput="showSubmitButton();resizeTextarea();updateCharCount();"></textarea>
         <div id="charCount">5000</div>
+
         <div class="input-group">
-          <label for="imageInput" class="custom-file-label" tabindex="0">Attach an image</label>
-          <span id="fileName" class="file-name">No file chosen</span>
+          <button 
+            type="button" 
+            class="custom-file-label" 
+            onclick="document.getElementById('imageInput').click();"
+            tabindex="0">
+            <img src="https://www.freeiconspng.com/thumbs/upload-icon/upload-icon-31.png" alt="upload icon" class="icon">
+            Attach an image
+          </button>
+          <span id="fileName" class="file-name" aria-live="polite">No file chosen</span>
           <input 
             type="file" 
             id="imageInput" 
             accept="image/*" 
-            onchange="updateFileName(); checkImageValidity();">
+            onchange="updateFileName(); checkImageValidity();"
+            aria-describedby="imageError">
         </div>
-        <p id="imageError" style="color: red; display: none;">Please upload a valid image file.</p>
+        <p id="imageError" style="color: red; display: none;" role="alert">Please upload a valid image file.</p>
         <button 
           type="submit" 
           id="submitButton" 
           tabindex="0" 
-          class="submit-button">
+          class="submit-button" hidden>
           Submit</button>
       </form>
       <br></br>
-      <div id="loading" style="display: none;" class="loading-indicator">Loading...</div>
-      <div id="response" class="response"></div>
+      <div id="loading" style="display: none;">
+        <p id="loadingText" class="loading-indicator" aria-live="polite">Loading...</p>
+        <img 
+          src="https://mir-s3-cdn-cf.behance.net/project_modules/disp/dae67631234507.564a1d230a290.gif" 
+          alt="loading icon" 
+          class="loading-icon"
+          id="loading">
+      </div>
+      <p id="error" style="color: red; display: block;">ERROR ELEMENT</p>
+      <div id="response" class="response" aria-live="polite" hidden></div>
     </main>
 
     <script>
-      let detectedLang = 'en'
-      let FAQ = ""
-      async function load() {
-        // FAQ = await wrapper("getFAQdata");
-        FAQ = await wrapper("getDocData")
 
-        document.querySelector('[data-status="loading"]').style.display = "none";
-        document.querySelector('[data-status="loaded"]').style.display = "block";
-      }
+      document.addEventListener("DOMContentLoaded", load);
+
+      let detectedLang = "en";
+      let FAQ = [];
       let convo = "";
 
-      window.onload = load
-
-      // Functions to show/hide the loading indicator
-      function showLoading() {document.getElementById('loading').style.display = 'block';}
-      function hideLoading() {document.getElementById('loading').style.display = 'none';}
-      function hideSubmitButton() {document.getElementById('submitButton').style.display = 'none'}
       function showSubmitButton() {
+        const submitButton = document.getElementById('submitButton')
         if (document.getElementById('loading').style.display == "none") {
           if (document.getElementById('userInput').value !== '') {
-            const submitButton = document.getElementById('submitButton')
             submitButton.style.display = 'inline-block'
             submitButton.setAttribute('tabindex', '0');
-          } else {hideSubmitButton()}
+          } else submitButton.style.display = 'none'
         }
+      }
+
+      function hideSubmitButton() {
+        document.getElementById("submitButton").style.display = 'none'
+      }
+
+      function updateCharCount() {
+          const textarea = document.getElementById("userInput");
+          document.getElementById("charCount").textContent = textarea.maxLength - textarea.value.length;
       }
       
       function resizeTextarea() {
@@ -94,15 +123,6 @@
         const input = document.getElementById('imageInput');
         const fileName = input.files.length > 0 ? input.files[0].name : 'No file chosen';
         document.getElementById('fileName').textContent = fileName;
-      }
-
-      function updateCharCount() {
-        const textarea = document.getElementById('userInput');
-        const maxLength = textarea.maxLength; // Gets the maxlength attribute
-        const currentLength = textarea.value.length;
-        const remaining = maxLength - currentLength;
-        
-        document.getElementById('charCount').textContent = `${remaining}`;
       }
 
       function checkImageValidity() {
@@ -121,94 +141,96 @@
         }
       }
 
-      async function wrapper(funcName, ...args) {
+      async function wrapper(funcName, fallback, ...args) {
         /*An async wrapper to simplify calling functions from Code.gs
         and not have the ugly ahh google.script.run(func(args){...}).func()
         ex. Suppose we have a function foo(a, b) defined in Code.gs
         and it needs async, then in the frontend to wait for the exec:
-        await wrapper("foo", a, b) where a, b are ints or some type
+        await wrapper("foo", a, b) where a, b are any type
         */
+        const errorEle = document.getElementById('error')
         return new Promise((resolve, reject) => {
           google.script.run
             .withSuccessHandler(function(response) {
+              errorEle.style.display = "none"
               resolve(response);
             })
             .withFailureHandler(function(error) {
-              reject(error);
+              errorEle.textContent = error
+              console.log(`${funcName}: ${errorEle.textContent}`)
+              errorEle.style.display = "block"
+              resolve(fallback);
             })[funcName](...args); // Dynamically call the function with arguments
         });
       }
 
       async function getResponse(event) {
-        //Handle the form submit according to the flowchart
-        event.preventDefault()
-        showLoading()
-        hideSubmitButton();
-        //Update detected language for translations
-        let loadingIndicator = document.getElementById('loading')
-        let userInput = event.currentTarget.querySelector('#userInput').value
-        let imageInput = document.getElementById("imageInput").files[0];
-        [userInput, detectedLang] = await wrapper("detectLanguage", userInput)
-        console.log("Detected language:", userInput, detectedLang)
+          console.time("Total Response Time")
+          event.preventDefault();
 
-        if (imageInput) {
-          loadingIndicator.textContent = "Processing image..."
-          imageToUrl(imageInput)
-            .then((url) => { imageInput = url })
-            .catch((e) => { imageInput = "" })
-        }
+          const userInput = document.getElementById("userInput").value.trim();
+          const imageInput = document.getElementById("imageInput").files[0];
+          const responseEle = document.getElementById("response");
+          const loadingIndicator = document.getElementById("loadingText");
 
-        document.getElementById('userInput').value = '';
-        document.getElementById('imageInput').value = ''
+          if (!userInput) return;
 
-        console.time("faq search")
-        //Determine if user question is already answered in FAQ
-        loadingIndicator.textContent = "Searching FAQ..."
-        const faqAnswer = await getFAQ(userInput);
-        const responseEle = document.getElementById('response');
-        responseEle.style.display = 'none';
-        console.timeEnd("faq search")
+          document.getElementById("loading").style.display = 'block';
+          hideSubmitButton()
 
-        if (faqAnswer) {
-          //If a relevant answer was found, directly set response to the answer
-          console.time("faq rendering")
-          responseEle.innerHTML = "<h2>Response (From FAQ):</h2>" + texme.render(faqAnswer)
-          if (detectedLang != 'en') {
-            loadingIndicator.textContent = await wrapper('translateText', 'Translating FAQ response...', detectedLang)
-            await translateAndRender(responseEle, detectedLang)
+          const [translatedInput, detectedLang] = await wrapper("detectLanguage", "en", userInput);
+
+          let imageUrl = "";
+          if (imageInput) {
+              loadingIndicator.textContent = "Processing Image..."
+              try {
+                  imageUrl = await imageToUrl(imageInput);
+              } catch (e) {
+                  console.error("Image processing failed: " + e.message);
+              }
           }
-          console.timeEnd("faq rendering")
-          
-          convo += ` User: ${userInput} Response: ${faqAnswer.replace(/\(<data:.+?>\)/g, '')};`
-        } else {
-          console.time("ai response")
-          loadingIndicator.textContent = "Awaiting AI Response..."
-          const fullInput = `HISTORY: ${convo} CURRENT PROMPT: ${userInput}`
-          //Translate the "Response:" element
-          const translatedHeader = await wrapper('translateText', "Response:", detectedLang)
-          //Get response from Groq
-          let response = await wrapper("getContent", fullInput, imageInput, detectedLang)
-          //Render any markdown and latex in response
-          console.timeEnd("ai response")
-          console.time("ai rendering")
-          if (detectedLang != 'en') {
-            loadingIndicator.textContent = await wrapper('translateText', 'Translating AI response...', detectedLang)
-            responseEle.innerHTML = `<h2>${translatedHeader}</h2>` + texme.render(response)
-          }
-          MathJax.typeset()
 
-          convo += ` User: ${userInput} Response: ${response};`
-          //Keep summarizing the conversation when it reaches >1k characters
-          convo = convo.length < 1000 ? convo : await wrapper("getGroqSummary", convo, 1000);
-          console.timeEnd("ai rendering")
-        }
-        responseEle.style.display = 'block';
-        hideLoading()
-        loadingIndicator.textContent = "Loading..."
-        resizeTextarea()
+          document.getElementById("userInput").value = "";
+          document.getElementById("imageInput").value = "";
+
+          loadingIndicator.textContent = "Searching FAQ..."
+          const faqAnswer = await getFAQ(translatedInput);
+
+          if (faqAnswer) {
+              responseEle.innerHTML = `<h2>Response (From FAQ):</h2> ${faqAnswer.answer}`;
+              if (faqAnswer.type === "pdf") {
+                  responseEle.innerHTML += `<iframe src="${faqAnswer.answer}" width="100%" height="600px"></iframe>`;
+              }
+              if (detectedLang !== "en") {
+                  loadingIndicator.textContent = "Translating Response..."
+                  await translateAndRender(responseEle, detectedLang);
+              }
+          } else {
+              loadingIndicator.textContent = "Generating AI Response..."
+              const fullPrompt = `HISTORY: ${convo} CURRENT PROMPT: ${translatedInput}`;
+              console.time("Getting response")
+              let aiResponse = await wrapper("getContent", "Response failed... sorry🥺", fullPrompt, imageUrl, detectedLang);
+              console.timeEnd("Getting response")
+              responseEle.innerHTML = `<h2>Response:</h2> ${texme.render(aiResponse)}`;
+              MathJax.typeset()
+              convo += ` User: ${translatedInput} Response: ${aiResponse};`;
+          }
+
+          document.getElementById("loading").style.display = 'none';
+          responseEle.hidden = false;
+          console.timeEnd("Total Response Time")
       }
 
-    hideSubmitButton();
+      async function load() {
+        document.getElementById("page").style.display="none"
+        console.time("Loading FAQ")
+        FAQ = await wrapper("getFAQdata", []);
+        console.timeEnd("Loading FAQ")
+
+        document.getElementById("submitButton").style.display="none"
+        document.querySelector('[data-status="loading"]').style.display = "none";
+        document.querySelector('[data-status="loaded"]').style.display = "block";
+      }
     </script>
   </body>
 </html>

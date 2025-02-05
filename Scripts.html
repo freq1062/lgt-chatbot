@@ -6,48 +6,55 @@
     doesn't have async */
     const flattenedQuestions = faq_questions.flat();
     console.time("calling huggingface")
-    const similarities = await wrapper("getSimilarities", source_sentence, flattenedQuestions)
+
+    const similarities = await wrapper("getSimilarities", fallback=[], source_sentence, flattenedQuestions)
+
     console.timeEnd("calling huggingface")
+
     const maxScore = Math.max(...similarities);
-    if (maxScore < 0.5) {
-      return null
-    } else {
-        const maxEle = flattenedQuestions[similarities.indexOf(maxScore)];
-        
-        // Find the parent array index in the original faq_questions
-        let parentIndex = 0;
-        for (var i = 0; i < faq_questions.length; i++) {
-          if (faq_questions[i].includes(maxEle)) {
-            parentIndex = i
-          }
-        }
-        return FAQ[parentIndex].answer;
+    if (maxScore < 0.5) return null;
+    const maxIndex = similarities.indexOf(maxScore)
+    const maxEle = flattenedQuestions[maxIndex];
+
+    const parentIndex = faq_questions.findIndex(group => group.includes(maxEle));
+    return FAQ[parentIndex] || null;
+  }
+
+async function getFAQ(userInput) {
+  if (!userInput) return null;
+
+  let source_sentence = userInput;
+  const faq_questions = FAQ.map(item => item.questions);
+
+  if (userInput.length > 1000) {
+    try {
+      source_sentence = await wrapper("getGroqSummary", userInput.substring(0, 1000), userInput, 100);
+    } catch (e) {
+      console.error(e);
     }
   }
+  
+  return highestSimilarity(source_sentence, faq_questions);
+}
 
   async function getFAQ(userInput) {
     /*
     Compare user question with FAQ questions in spreadsheet and return associated answer
     if the cosine similarity > 0.5, otherwise null
-    PRECONDITION: userInput is in english
+    PRECONDITION: userInput is in english and non-empty
     */
     let source_sentence = userInput
     let faq_questions = FAQ.map(item => item.questions)
 
     if (userInput.length > 1000) {
       //Approximately 150 words on average
-      let promptSummary = ""
-      wrapper("getGroqSummary", userInput, 100)
-        .then((summary) => { promptSummary = summary })
-        .catch((e) => {
-          console.log(e)
-          promptSummary = userInput
-        })
-      source_sentence = promptSummary ? promptSummary : userInput
-      return highestSimilarity(source_sentence, faq_questions)
-    } else {
-      return highestSimilarity(source_sentence, faq_questions)
+      try {
+        source_sentence = await wrapper("getGroqSummary", fallback=userInput.substring(0, 1000), userInput, 100)
+      } catch(e) {
+        console.error(e);
+      }
     }
+    return highestSimilarity(source_sentence, faq_questions);
   }
 
   function imageToUrl(imageInput) {
@@ -56,49 +63,31 @@
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
-      reader.onload = function () {
-        const buffer = reader.result;
-        const byteArray = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < byteArray.length; i++) {
-          binary += String.fromCharCode(byteArray[i]);
-        }
-        // Convert binary string to base64
-        const mimeType = imageInput.type;
-        const base64Url = `data:image/${mimeType};base64,${window.btoa(binary)}`;
-        resolve(base64Url);
-      };
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed to read image file."));
 
-      reader.onerror = function () {
-        reject(new Error("Failed to read image file."));
-      };
-
-      reader.readAsArrayBuffer(imageInput);
+      reader.readAsDataURL(imageInput);
     });
   }
 
   async function translateAndRender(parentEle, targetLang) {
-    //Manually translate placeholder text because it wont be found by text element search
-    //Not sure if we actually want to translate this, uncomment if yes
-
-    // const textarea = document.getElementById('userInput');
-    // textarea.placeholder = await wrapper("translateText", textarea.placeholder, targetLang)
-    // const placeholder = textarea.placeholder;
-
     const walker = document.createTreeWalker(parentEle, NodeFilter.SHOW_TEXT, null, false);
 
     const textNodes = [];
-    while (walker.nextNode()) {
-      textNodes.push(walker.currentNode);
-    }
+    const untranslatedTexts = []
 
-    for (const node of textNodes) {
-      nodeText = node.nodeValue;
-      if (nodeText.length > 1 && nodeText.trim()) {
-        nodeText = await wrapper("translateText", nodeText, targetLang)
+    while (walker.nextNode()) {
+      let nodeText = walker.currentNode.nodeValue.trim();
+      if (nodeText.length > 1) {
+        untranslatedTexts.push(nodeText);
+        textNodes.push(walker.currentNode);
       }
-      node.nodeValue = nodeText
     }
+    if (untranslatedTexts.length === 0) return;
+
+    const translatedTexts = await wrapper("massArrTranslate", untranslatedTexts, untranslatedTexts, targetLang);
+
+    textNodes.forEach((node, index) => node.nodeValue = translatedTexts[index]);
   }
 
 </script>
