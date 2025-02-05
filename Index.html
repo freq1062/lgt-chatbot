@@ -197,9 +197,11 @@
           const faqAnswer = await getFAQ(translatedInput);
 
           if (faqAnswer) {
-              responseEle.innerHTML = `<h2>Response (From FAQ):</h2> ${faqAnswer.answer}`;
               if (faqAnswer.type === "pdf") {
                   responseEle.innerHTML += `<iframe src="${faqAnswer.answer}" width="100%" height="600px"></iframe>`;
+              } else {
+                responseEle.innerHTML = `<h2>Response (From FAQ):</h2> ${texme.render(faqAnswer.answer)}`;
+                MathJax.typeset()
               }
               if (detectedLang !== "en") {
                   loadingIndicator.textContent = "Translating Response..."
