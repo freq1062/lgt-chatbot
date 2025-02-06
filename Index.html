@@ -194,7 +194,7 @@
           document.getElementById("userInput").value = "";
           document.getElementById("imageInput").value = "";
           document.getElementById('fileName').textContent = "No file chosen"
-          resizeTextarea();
+          resizeTextarea(); updateCharCount();
 
           loadingIndicator.textContent = "Searching FAQ..."
           const faqAnswer = await getFAQ(translatedInput);
