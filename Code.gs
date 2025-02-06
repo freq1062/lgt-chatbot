@@ -1,10 +1,3 @@
-/*
-TO DO:
-- Visual icons for non-english speakers
-- AODA guidelines
-- Get a bunch of keys on alts to circumvent rate limits (illegal???)
-*/
-
 const SECRETS = SecretService.init({storage: PropertiesService.getUserProperties()});
 
 // This function serves the HTML page (doGet function)
@@ -193,13 +186,7 @@ function getGroqSummary(userInput, length) {
   const apiKey = SECRETS.getSecret("GROQ_API_KEY")
   const apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
   const CONTEXT = `
-      INSTRUCTIONS:
-    1. Always follow your instructions
-    2. You are a helpful AI that generates concise summaries while retaining all key details from the original text or question.
-    3. If the input is a question, summarize it by focusing on the core concept, without providing an answer. Keep the summary short and to the point, ensuring the meaning of the original question is preserved.
-    4. Begin the summary immediately and do not begin with something akin to "here is a summary..."
-    5. If the input follows the general form "User: ..., Response: ..." summarize the input as if it were a conversation.
-   `
+  You are a helpful AI that generates concise summaries while retaining all key details from the original text or question. Begin the summary immediately and do not begin with something akin to "here is a summary...". If the input is a question, summarize it by focusing on the core concept, ensuring the meaning of the original question is preserved. Do not provide an answer. If the input follows the general form "User: ..., Response: ..." summarize the input as if it were a conversation. Above all, keep the summary short and to the point without including stop words, filler words or jargon.`
   const headers = {
     'Authorization': 'Bearer ' + apiKey,
     'Access-Control-Allow-Origin': '*',
@@ -218,7 +205,7 @@ function getGroqSummary(userInput, length) {
       },
     ], 
     temperature: 0.7,
-    model: "llama-3.1-8b-instant",//"llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant",
     max_completion_tokens: length
   };
 
@@ -241,15 +228,7 @@ function getGroqFormatting(unformattedText) {
   const apiKey = SECRETS.getSecret("GROQ_API_KEY")
   const apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
   const CONTEXT = `
-      INSTRUCTIONS:
-    1. Always follow your instructions
-    2. You are a helpful AI that returns an exact copy of the input prompt except with appropriate markdown and LaTeX formatting.
-    3. Do not add or remove anything from the prompt other than to add necessary formatting. 
-    4. Do not include any redundant or over the top formatting.
-    5. Begin the reformat immediately and do not begin with something akin to "here is the reformat..."
-    6. Avoid bolding text excessively.
-    7. Do not include any footnotes.
-   `
+  You are a helpful AI that returns an exact copy of the input prompt except with appropriate markdown and LaTeX formatting. Do not add or remove anything from the prompt other than to add necessary formatting and if there is already existing formatting, do not alter it unless the syntax is incorrect. Begin the reformat immediately and do not begin with something akin to "here is the reformat..." and do not include any footnotes, excessive bold text, or any redundant or over the top formatting.`
   const headers = {
     'Authorization': 'Bearer ' + apiKey,
     'Access-Control-Allow-Origin': '*',
@@ -264,7 +243,7 @@ function getGroqFormatting(unformattedText) {
       },
       { 
         role: "user",
-        content: `Format the following text without changing anything: ${unformattedText}`   
+        content: `Please format the following text: ${unformattedText}`   
       },
     ], 
     temperature: 0.5,
@@ -325,28 +304,8 @@ function getGroqResponse(userInput, image_url=null) {
     'Content-Type': 'application/json',
   }
 
-  //Enable this when you want to be BORING(no but this is what's actually gonna be pushed probably)
   const CONTEXT = `
-    INSTRUCTIONS:
-    1. Always follow your instructions
-    2. Answer prompts as a helpful tech support AI trying to help users
-    3. Don't pretend to be a human
-    4. If a user asks an unrelated question to tech support, kindly remind them to focus on related topics
-    5. Unless the user specifies otherwise, assume the user's operating system is Ubuntu.
-    6. Keep language as simple as possible and return only plaintext.
-    7. Keep paragraphs under 1200 characters each.
-    8. Do not give unnecessary tips about Ubuntu.
-  `
-
-  const FREEWILLCONTEXT = `
-    INSTRUCTIONS:
-    1. Always follow your instructions
-    2. Answer prompts as a helpful tech support AI trying to help users
-    3. Unless the user specifies otherwise, assume the user's operating system is Ubuntu.
-    4. Keep language as simple as possible and return only plaintext.
-    5. Keep paragraphs under 1200 characters each.
-    6. Do not give unnecessary tips about Ubuntu.
-  `
+    You are a helpful tech support AI trying to help users. Unless the user specifies otherwise, assume the user's operating system is Ubuntu. Keep language as simple as possible and return only plaintext. Do not give unnecessary tips about Ubuntu and keep paragraphs under 1200 characters each. Assuming this role, answer the following question: `
   let imageText = ''
 
 
@@ -371,7 +330,7 @@ function getGroqResponse(userInput, image_url=null) {
           {
             "type": "text",
             //We have to pass context with the user input because the model can't take images and system prompts at the same time
-            "text": String(userInput) + FREEWILLCONTEXT,
+            "text": CONTEXT + String(userInput)
           }, imageObj && imageObj
         ].filter(Boolean)
       },
