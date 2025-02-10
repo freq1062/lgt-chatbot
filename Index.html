@@ -65,7 +65,7 @@
             onchange="updateFileName(); checkImageValidity();"
             aria-describedby="imageError">
         </div>
-        <p id="imageError" style="color: red; display: none;" role="alert">Please upload a valid image file.</p>
+        <p id="imageError" style="color: red; display: none;" role="alert"></p>
         <button 
           type="submit" 
           id="submitButton" 
@@ -129,9 +129,16 @@
         const imageInput = document.getElementById("imageInput").files[0];
         const imageError = document.getElementById("imageError");
         const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        const file = imageInput.type;
 
-        if (!validTypes.includes(String(file))) {
+        if (!validTypes.includes(String(imageInput.type))) {
+          imageError.textContent = "Please upload a valid image file."
+          imageError.style.display = 'block';
+          document.getElementById('imageInput').value = ''
+          document.getElementById('fileName').textContent = "No file chosen"
+          hideSubmitButton();
+        } else if (imageInput.size > 1024 * 1024) {
+          //OCR has a max input size of 1MB
+          imageError.textContent = "Image size too large - limit 1MB."
           imageError.style.display = 'block';
           document.getElementById('imageInput').value = ''
           document.getElementById('fileName').textContent = "No file chosen"

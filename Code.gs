@@ -108,38 +108,42 @@ function getFAQdata() {
     for (var i = 1; i < data.length; i++) {
       const questions = String(data[i][QUESTIONCOL]).split(";").map(q => q.trim());
       var answer = String(data[i][ANSWERCOL])
-      var type = "text"
+      //Ignore merged headers and empty answers
+      if (answer){
+        //Plaintext is also rendered as markdown, however doesn't have newline
+        var type = "markdown"
 
-      //Check if answer is a link to a google drive file
-      if (answer.startsWith("https://drive.google.com/file/d/")) {
-        const match = answer.match(/\/d\/(.+)\//)
-        if (match) {
-          var id = match[1]
-          try {
-            var file = DriveApp.getFileById(id);
-            var mimeType = file.getMimeType();
-            //Check between markdown and pdf
-            if (mimeType == 'text/markdown') {
-              answer = file.getBlob().getDataAsString()
-              type = "markdown"
-            } else if (mimeType == 'application/pdf') {
-              answer = `https://drive.google.com/file/d/${id}/preview`
-              type = "pdf"
+        //Check if answer is a link to a google drive file
+        if (answer.startsWith("https://drive.google.com/file/d/")) {
+          const match = answer.match(/\/d\/(.+)\//)
+          if (match) {
+            var id = match[1]
+            try {
+              var file = DriveApp.getFileById(id);
+              var mimeType = file.getMimeType();
+              //Check between markdown and pdf
+              if (mimeType == 'text/markdown') {
+                answer = file.getBlob().getDataAsString()
+              } else if (mimeType == 'application/pdf') {
+                answer = `https://drive.google.com/file/d/${id}/preview`
+                type = "pdf"
+              }
+            } catch(e) {
+              answer = "Invalid file ID:", answer
             }
-          } catch(e) {
-            answer = "Invalid file ID:", answer
+          } else {
+            answer = `Invalid file: ${answer}`
           }
-        } else {
-          answer = `Invalid file: ${answer}`
         }
+        result.push({ questions: questions, answer: answer, type: type });
       }
-      result.push({ questions: questions, answer: answer, type: type });
     }
     return result
   } catch(e) {
     throw new Error("Unable to pull FAQ data: \n" + e.message)
   }
 }
+console.log(getFAQdata())
 
 function cosineSimilarity(vec1, vec2) {
   /*Helper function for getSimilarities */
