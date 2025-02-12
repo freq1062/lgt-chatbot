@@ -16,16 +16,17 @@ function getToken(serv) {
   const usages = JSON.parse(scriptProperties.getProperty("USAGE"))[serv]
   switch(serv) {
     case "GROQ":
+      minCounts = [Infinity, Infinity]
       for (const key in usages) {
         /*Rate limit: 3500 requests per day, 250,000 tokens per day 
         I doubt we'll hit the 15 per minute or 7000 tokens per minute*/
         const { completion_tokens, count } = usages[key];
-        if (count < 3500 && completion_tokens < 250000) {
-          return key
+        if (completion_tokens < minCounts[0] || count < minCounts[1]) {
+          minCounts = [completion_tokens, count]
+          selectedKey = key;
         }
       }
-      //Really hope this doesn't happen
-      return -1
+      return selectedKey;
     case "OCR":
     case "HF":
       minCount = Infinity

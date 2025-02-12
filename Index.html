@@ -58,10 +58,10 @@
             Attach an image
           </button>
           <span id="fileName" class="file-name" aria-live="polite">No file chosen</span>
-          <input 
+          <input
             type="file" 
             id="imageInput" 
-            accept="image/*" 
+            accept=".png, .jpg, .jpeg, .webp"
             onchange="updateFileName(); checkImageValidity();"
             aria-describedby="imageError">
         </div>
@@ -128,10 +128,10 @@
       function checkImageValidity() {
         const imageInput = document.getElementById("imageInput").files[0];
         const imageError = document.getElementById("imageError");
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
         if (!validTypes.includes(String(imageInput.type))) {
-          imageError.textContent = "Please upload a valid image file."
+          imageError.textContent = "Sorry, only PNG, JPG, and WebP files are allowed."
           imageError.style.display = 'block';
           document.getElementById('imageInput').value = ''
           document.getElementById('fileName').textContent = "No file chosen"
