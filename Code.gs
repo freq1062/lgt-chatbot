@@ -1,9 +1,98 @@
+/*To do:
+- Scavenger hunt event activities
+ */
 const SECRETS = SecretService.init({storage: PropertiesService.getUserProperties()});
 
 // This function serves the HTML page (doGet function)
 function doGet() {
 return HtmlService.createTemplateFromFile('Index.html')
   .evaluate();
+}
+
+function getToken(serv) {
+  /*Given a service, returns the appropriate API key 
+  to avoid rate limit. Services are GROQ, HF, OCR */
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const usages = JSON.parse(scriptProperties.getProperty("USAGE"))[serv]
+  switch(serv) {
+    case "GROQ":
+      for (const key in usages) {
+        /*Rate limit: 3500 requests per day, 250,000 tokens per day 
+        I doubt we'll hit the 15 per minute or 7000 tokens per minute*/
+        const { completion_tokens, count } = usages[key];
+        if (count < 3500 && completion_tokens < 250000) {
+          return key
+        }
+      }
+      //Really hope this doesn't happen
+      return -1
+    case "OCR":
+    case "HF":
+      minCount = Infinity
+      for (const key in usages) {
+        const value = usages[key];
+        if (value < minCount) {
+          minCount = value;
+          selectedKey = key;
+        }
+      }
+      return selectedKey;
+    default: throw new Error("Unknown service: " + serv);
+  }
+}
+
+function addTokens(ocr, hf, groq) {
+  /*After adding the tokens to SecretService,
+  update script properties - helper function*/
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const usages = JSON.parse(scriptProperties.getProperty("USAGE"))
+  usages["OCR"][ocr] = 0
+  usages["HF"][hf] = 0
+  usages["GROQ"][groq] = {"count": 0, "completion_tokens": 0}
+}
+
+function updateToken(serv, key, completion_tokens=null) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const lastUpdateStr = scriptProperties.getProperty("LAST_UPDATE");
+  //Initialize lastUpdate if its not already there
+  const lastUpdate = lastUpdateStr ? JSON.parse(lastUpdateStr) : { timestamp: new Date().getTime() };
+  const usages = JSON.parse(scriptProperties.getProperty("USAGE"));
+
+  //Reset all the tokens every 24 hours
+  const currentTime = new Date().getTime();
+  const oneDayInMillis = 24 * 60 * 60 * 1000;
+  if (currentTime - lastUpdate.timestamp > oneDayInMillis) {
+    for (let service in usages) {
+      for (let key in usages[service]) {
+        if (service === "GROQ") {
+          usages[service][key].completion_tokens = 0;
+          usages[service][key].count = 0;
+        } else {
+          usages[service][key] = 0;
+        }
+      }
+    }
+  }
+  lastUpdate.timestamp = currentTime;
+  
+  //Actually update the tokens
+  switch(serv) {
+    case "GROQ":
+      /*We only keep track of 90b-vision because summary, formatting
+      output similar tokens and those have much higher rate limits */
+      usages[serv][key].completion_tokens += completion_tokens;
+      usages[serv][key].count += 1;
+      break;
+    case "OCR":
+      usages[serv][key] += 1
+      break;
+    case "HF":
+      usages[serv][key] += 1
+      break;
+    default: throw new Error("Unknown service: " + serv);
+  }
+  scriptProperties.setProperty("USAGE", JSON.stringify(usages))
+  scriptProperties.setProperty("LAST_UPDATE", JSON.stringify(lastUpdate))
 }
 
 function translateText(text, targetLanguage) {
@@ -143,7 +232,6 @@ function getFAQdata() {
     throw new Error("Unable to pull FAQ data: \n" + e.message)
   }
 }
-console.log(getFAQdata())
 
 function cosineSimilarity(vec1, vec2) {
   /*Helper function for getSimilarities */
@@ -157,19 +245,20 @@ function getSimilarities(source_sentence, sentences) {
   /* Given a source sentence and an array of sentences,
   return an array of similarity scores between the source
   sentence and each of the sentences.*/
-  const apiKey = SECRETS.getSecret("HUGGINGFACE_API_KEY")
+  const apiKey = getToken("HF")
   const apiUrl = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2'
 
   const options = {
     method: "post",
     contentType: "application/json",
-    headers: {Authorization: `Bearer ${apiKey}`},
+    headers: {Authorization: `Bearer ${SECRETS.getSecret(apiKey)}`},
     payload: JSON.stringify({inputs: [source_sentence, ...sentences]})
   };
 
   try {
     const response = UrlFetchApp.fetch(apiUrl, options);
     const embeddings = JSON.parse(response.getContentText());
+    updateToken("HF", apiKey)
 
     // Extract similarity scores
     const sourceEmbedding = embeddings[0];
@@ -187,12 +276,12 @@ function getSimilarities(source_sentence, sentences) {
 
 function getGroqSummary(userInput, length) {
   //Secondary summary API to shorten conversation histories
-  const apiKey = SECRETS.getSecret("GROQ_API_KEY")
+  const apiKey = getToken("GROQ")
   const apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
   const CONTEXT = `
   You are a helpful AI that generates concise summaries while retaining all key details from the original text or question. Begin the summary immediately and do not begin with something akin to "here is a summary...". If the input is a question, summarize it by focusing on the core concept, ensuring the meaning of the original question is preserved. Do not provide an answer. If the input follows the general form "User: ..., Response: ..." summarize the input as if it were a conversation. Above all, keep the summary short and to the point without including stop words, filler words or jargon.`
   const headers = {
-    'Authorization': 'Bearer ' + apiKey,
+    'Authorization': 'Bearer ' + SECRETS.getSecret(apiKey),
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
   }
@@ -229,12 +318,12 @@ function getGroqSummary(userInput, length) {
 }
 
 function getGroqFormatting(unformattedText) {
-  const apiKey = SECRETS.getSecret("GROQ_API_KEY")
+  const apiKey = getToken("GROQ")
   const apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
   const CONTEXT = `
   You are a helpful AI that returns an exact copy of the input prompt except with appropriate markdown and LaTeX formatting. Do not add or remove anything from the prompt other than to add necessary formatting and if there is already existing formatting, do not alter it unless the syntax is incorrect. Begin the reformat immediately and do not begin with something akin to "here is the reformat..." and do not include any footnotes, excessive bold text, or any redundant or over the top formatting.`
   const headers = {
-    'Authorization': 'Bearer ' + apiKey,
+    'Authorization': 'Bearer ' + SECRETS.getSecret(apiKey),
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
   }
@@ -269,17 +358,17 @@ function getGroqFormatting(unformattedText) {
   }
 }
 
-function getTesseractResponse(image_url) {
+function getTesseractResponse(base64_image) {
   /* Given an image URL in base 64 format, call the Tesseract OCR
     API (via OCR.space) to extract the text in the image and return it. */
-  const apiKey = SECRETS.getSecret("OCR_API_KEY");
+  const apiKey = getToken("OCR")
   const apiUrl = "https://api.ocr.space/parse/image";
 
   const params = {
     method: "post",
     payload: {
-      apikey: apiKey,
-      base64Image: image_url,
+      apikey: SECRETS.getSecret(apiKey),
+      base64Image: base64_image,
       language: "eng",
     },
   };
@@ -287,23 +376,24 @@ function getTesseractResponse(image_url) {
   try {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
+    updateToken("OCR", apiKey)
     if (jsonResponse.IsErroredOnProcessing) {
       throw new Error(`Error processing iamge: ${jsonResponse.ErrorMessage}`)
     }
     // Extract text from the first parsed result
     return jsonResponse.ParsedResults[0].ParsedText || null;
   } catch (e) {
-    throw new Error("Unable to call image-to-text: \n" + e.message)
+    // OCR is optional anyway so just continue if it doesn't work
+    return ""
   }
 }
 
 function getGroqResponse(userInput, image_url=null) {
   /*Call the Groq API and return the response */
-  const apiKey = SECRETS.getSecret("GROQ_API_KEY")
+  const apiKey = getToken("GROQ")
   const apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
-
   const headers = {
-    'Authorization': 'Bearer ' + apiKey,
+    'Authorization': 'Bearer ' + SECRETS.getSecret(apiKey),
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
   }
@@ -352,17 +442,18 @@ function getGroqResponse(userInput, image_url=null) {
   try {
     const response = UrlFetchApp.fetch(apiUrl, params);
     const jsonResponse = JSON.parse(response.getContentText());
+    updateToken("GROQ", apiKey, jsonResponse.usage.completion_tokens)
     return jsonResponse.choices[0].message.content || 'Sorry, no response from API.';
   } catch (e) {
     throw new Error("Unable to get response from AI: \n" + e.message)
   }
 }
 
-function getContent(userInput, image_url=null, lang) {
+function getContent(userInput, base64_image=null, lang) {
   /*General function to minimize the number of 
   frontend to backend calls. */
   try {
-    let response = getGroqResponse(userInput, image_url)
+    let response = getGroqResponse(userInput, base64_image)
     if (lang != 'en') {
       response = massTranslate(response, lang)
     }
