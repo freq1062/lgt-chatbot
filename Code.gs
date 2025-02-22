@@ -1,4 +1,6 @@
 /*To do:
+- Vector database instead of huggingface? Get rid of that "api starting up" error 
+- Be able to see previous questions and answers by pressing left and right arrows to navigate
 - Scavenger hunt event activities
  */
 const SECRETS = SecretService.init({storage: PropertiesService.getUserProperties()});
@@ -53,6 +55,8 @@ function addTokens(ocr, hf, groq) {
 }
 
 function updateToken(serv, key, completion_tokens=null) {
+  /*Given a service and the key that was called, update
+  the script properties to keep track of used calls */
   const scriptProperties = PropertiesService.getScriptProperties();
   const lastUpdateStr = scriptProperties.getProperty("LAST_UPDATE");
   //Initialize lastUpdate if its not already there
@@ -385,7 +389,7 @@ function getTesseractResponse(base64_image) {
     return jsonResponse.ParsedResults[0].ParsedText || null;
   } catch (e) {
     // OCR is optional anyway so just continue if it doesn't work
-    return ""
+    throw new Error("Could not read text from image: \n" + e.message)
   }
 }
 
@@ -407,13 +411,17 @@ function getGroqResponse(userInput, image_url=null) {
   let imageObj = null
 
   if (image_url) {
-    imageText = getTesseractResponse(image_url)
-    userInput += ` Text in image from OCR: ${imageText ? imageText : "None"}`
-    imageObj = {
-      "type": "image_url",
-      "image_url": {
-        "url": image_url,
-      }
+    try {
+      imageText = getTesseractResponse(image_url)
+      userInput += ` Text in image from OCR: ${imageText ? imageText : "None"}`
+      imageObj = {
+        "type": "image_url",
+        "image_url": {
+          "url": image_url,
+        }
+      }      
+    } catch(e) {
+      throw new Error("Unable to read from image: \n" + e.message)
     }
   }
 

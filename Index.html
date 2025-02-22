@@ -228,6 +228,8 @@
               convo += ` User: ${translatedInput} Response: ${aiResponse};`;
           }
 
+          // Make all links open in new tab
+          document.querySelectorAll('a').forEach(link => {link.setAttribute('target', '_blank');});
           document.getElementById("loading").style.display = 'none';
           responseEle.hidden = false;
           console.timeEnd("Total Response Time")
