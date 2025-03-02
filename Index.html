@@ -186,7 +186,10 @@
           document.getElementById("loading").style.display = 'block';
           hideSubmitButton()
 
-          const [translatedInput, detectedLang] = await wrapper("detectLanguage", "en", userInput);
+          let [translatedInput, detectedLang] = await wrapper("detectLanguage", "en", userInput);
+          if (userInput.length <= 15) {
+            detectedLang = "en"; 
+          }
 
           let imageUrl = "";
           if (imageInput) {

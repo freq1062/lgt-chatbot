@@ -90,4 +90,19 @@ async function getFAQ(userInput) {
     textNodes.forEach((node, index) => node.nodeValue = translatedTexts[index]);
   }
 
+  function isGibberish(text) {
+      // Check for a high number of unique characters (e.g., random letters)
+      const uniqueChars = new Set(text).size;
+      if (uniqueChars / text.length > 0.7) return true; // Too random
+
+      // Check for repeated character sequences (e.g., "asdfasdf")
+      if (/(.)\1{3,}/.test(text)) return true; // 3+ repeating chars
+
+      // If it's just a random mix of consonants (e.g., "qwrtypsdfg")
+      if (/^[bcdfghjklmnpqrstvwxyz]{6,}$/i.test(text)) return true;
+
+      return false; // Otherwise, it's likely meaningful
+  }
+
+
 </script>
