@@ -83,7 +83,7 @@
           id="loading">
       </div>
       <p id="error" style="color: #fc6262; display: block;">ERROR ELEMENT</p>
-      <div id="response" class="response" aria-live="polite">This is the response element</div>
+      <div id="response" class="response" aria-live="polite"></div>
     </main>
 
     <script>
@@ -240,7 +240,6 @@
                     loadingIndicator.textContent = "Translating Response..."
                     await translateAndRender(responseEle, detectedLang);
                 }
-                console.log(faqAnswer)
                 if (faqAnswer.questions.includes("Every locked door has a way through if you know where to look")) {
                   responseEle.innerHTML = responseEle.innerHTML + `<h2>In english:</h2> ${texme.render(faqAnswer.answer)}`;
                 }
