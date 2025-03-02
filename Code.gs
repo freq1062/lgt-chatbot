@@ -374,7 +374,9 @@ function getTesseractResponse(base64_image) {
     payload: {
       apikey: SECRETS.getSecret(apiKey),
       base64Image: base64_image,
+      // url: image_url,
       language: "eng",
+      filetype: "JPG",
     },
   };
 

@@ -12,7 +12,7 @@
     console.timeEnd("calling huggingface")
 
     const maxScore = Math.max(...similarities);
-    if (maxScore < 0.5) return null;
+    if (maxScore < 0.6) return null;
     const maxIndex = similarities.indexOf(maxScore)
     const maxEle = flattenedQuestions[maxIndex];
 
