@@ -3,6 +3,7 @@ A tech support AI chatbot written using Google Apps Script. Written for the [Let
 See the chatbot in action [here](https://sites.google.com/view/lgt-help/home)
 
 [Direct Google Macro Link](https://script.google.com/macros/s/AKfycbyT4pZE8nHDmnZ6YET55d5dGkN37KD-lhQcQfBIwaJtby-5cpr6eomRamjsgeyTuB2h/exec)
+<img width="1568" height="556" alt="image" src="https://github.com/user-attachments/assets/ce6d1690-7e55-41d3-a5e9-8c2ce24ce3d9" />
 
 HOW TO EDIT:
 1. Create a fork of this project to work on in your own GitHub account.
