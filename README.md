@@ -2,6 +2,8 @@
 A tech support AI chatbot written using Google Apps Script. Written for the [Let's Get Together](https://www.letsgettogether.ca/) nonprofit as a part of the 2024 [Social Innovation Project](https://www.utm.utoronto.ca/utm-engage/volunteering/social-innovation-project) volunteer organization.
 See the chatbot in action [here](https://sites.google.com/view/lgt-help/home)
 
+[Direct Google Macro Link](https://script.google.com/macros/s/AKfycbyT4pZE8nHDmnZ6YET55d5dGkN37KD-lhQcQfBIwaJtby-5cpr6eomRamjsgeyTuB2h/exec)
+
 HOW TO EDIT:
 1. Create a fork of this project to work on in your own GitHub account.
 
