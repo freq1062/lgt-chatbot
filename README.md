@@ -10,6 +10,7 @@ See the chatbot in action [here](https://sites.google.com/view/lgt-help/home)
 1. Chat memory: Whenever an input is received, the backend stores a summary of the overall conversation to allow the user to refer to things that have been brought up since starting the conversation.
 2. Retrieval Augmented Generation (RAG): Whenever the user asks a question that matches with a list of questions and answers in a separate Google Sheet, the matching answer is returned instead of the normal LLM response to allow for more targeted and relevant responses.
 <img width="374" height="114" alt="image" src="https://github.com/user-attachments/assets/9909a93a-767c-45de-ac0b-e4d5df08db15" />
+
 3. Image recognition: The user can upload an image, and an OCR model will read the text from the image as well as give a high level overview of what the image contains. This allows the user to simply take a screenshot of any error messages they might have.
 4. Automatic translation: If the user asks a question in a language other than English, all responses and aspects of the chatbot box are translated to their respective language through the Google Translate API.
 
